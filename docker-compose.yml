@@ -1,0 +1,88 @@
+version: "3"
+
+networks:
+  remoteandtalent-net:
+    driver: bridge
+
+volumes:
+  dbdata:
+    driver: local
+
+services:
+  remoteandtalent-db:
+    container_name: remoteandtalent-db
+    image: postgres
+    volumes:
+      - dbdata:/var/lib/postgresql/data/
+      - ./init:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_USER: remoteandtalentdb
+      POSTGRES_PASSWORD: remoteandtalentdb
+      POSTGRES_DB: remoteandtalentdb
+    ports:
+      - 5432:5432
+    networks:
+      - remoteandtalent-net
+
+  remoteandtalent-front:
+    build:
+      context: ./profile-front/
+      dockerfile: Dockerfile
+    image: remoteandtalent-front:latest
+    container_name: remoteandtalent-front
+    tty: true
+    working_dir: /var/www
+    volumes:
+      - /var/www/vendor/
+      - ./profile-front/:/var/www
+    networks:
+      - remoteandtalent-net
+
+  remoteandtalent-front-server:
+    image: nginx:alpine
+    container_name: remoteandtalent-front-server
+    tty: true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./profile-front/:/var/www
+      - ./nginx/profile-front/conf.d/:/etc/nginx/conf.d/
+    networks:
+      - remoteandtalent-net
+
+  remoteandtalent-backend:
+    build:
+      context: ./backend/
+      dockerfile: Dockerfile
+    image: remoteandtalent-backend:latest
+    container_name: remoteandtalent-backend
+    tty: true
+    working_dir: /var/www
+    volumes:
+      - /var/www/vendor/
+      - ./backend/:/var/www
+    networks:
+      - remoteandtalent-net
+
+  remoteandtalent-backend-runner:
+    image: remoteandtalent-backend:latest
+    command: php artisan queue:work
+    volumes:
+      - /var/www/vendor/
+      - ./backend/:/var/www
+    networks:
+      - remoteandtalent-net
+
+  remoteandtalent-backend-server:
+    image: nginx:alpine
+    container_name: remoteandtalent-backend-server
+    tty: true
+    ports:
+      - "81:80"
+      - "444:443"
+    volumes:
+      - ./backend/:/var/www
+      - ./nginx/backend/conf.d/:/etc/nginx/conf.d/
+    networks:
+      - remoteandtalent-net
